@@ -1,1 +1,8 @@
 .DS_Store
+
+#env directory
+env_ipcs/
+
+**/.ipynb_checkpoints
+
+**/__pycache__
