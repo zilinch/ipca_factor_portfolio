@@ -3,7 +3,7 @@ from typing import List
 from ipca import InstrumentedPCA
 
 
-def IPCA_impute(
+def IPCA_impute_w_mean(
     df: pd.DataFrame, 
     characteristics: List[str], 
     threshold: int = None,
@@ -28,9 +28,7 @@ def IPCA_impute(
 
     assert not drop_characteristics or (drop_characteristics and threshold is not None), \
                         "When drop_characteristics is True, a threshold must be provided."
-    
-    # remove all rows/stocks that have missing values for next month return
-    df = df.dropna(subset=['ret_local_lead1m'])
+
 
     # if drop_characteristics: remove all columns/characteristics 
     # that have missing values greater than the threshold
@@ -45,62 +43,66 @@ def IPCA_impute(
     df_temp = df.set_index(['eom', 'id'])
     medians_by_time = df_temp.groupby(level=0).transform('median')
     df_imputed = df_temp.fillna(medians_by_time).reset_index()
+    df_imputed_sorted = df_imputed.sort_values(by='eom')
+
+    return df_imputed_sorted, characteristics
+
+
+
+def IPCA_factor(df, step, window_dates, current_date, characteristics, K, logger):
     
-    return df_imputed, characteristics
-
-
-
-def IPCA_factor(df, selected_dates, date_to_predict, characteristics, K):
-    """
-    Apply Instrumented PCA (IPCA) on a data frame to extract K principal components on a rolling window bais.
-    This function uses the Python implementation of the Instrumtented Principal Components Analysis 
-    framework by Kelly, Pruitt, Su. The paper can be found at:
-    https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2983919
-
-    Parameters:
-    ----------
-    df:
-        Pandas dataframe containing the return data and the characteristics
-    selected_dates:
-        All unique datetime within the current rolling window
-    date_to_predict:
-        The next date to predict
-    characteristics:
-        List of characteristics used for computing ipca
-    K:
-        Number of principal components
-
-    """
+    global lock
     
-
     # Filter the data to include only rows within the selected date range
-    window_data = df[df['eom'].isin(selected_dates)]
-    window_data_imputed, characteristics_to_keep = IPCA_impute(window_data, characteristics, threshold=30)
+    window_data = df[df['eom'].isin(window_dates)]
+    window_data_imputed, characteristics_to_keep = IPCA_impute_w_mean(window_data, characteristics, threshold=50)
     
     # Get the last date data from the window data
-    last_data = window_data_imputed[window_data_imputed['eom'] == selected_dates[-1]]
-    last_ids = last_data['id'].unique()
-
-    # Get the predict/next data but only keep stocks & characteristics appeared in last data
-    next_data = df[df['eom'] == date_to_predict]
-    next_data = next_data[next_data['id'].isin(last_ids)]  ###dont do this + drop stocks with no return
-    next_data_aligned = next_data[last_data.columns]
-    next_data_imputed, _ = IPCA_impute(next_data_aligned, characteristics_to_keep, drop_characteristics=False)
+    last_win_data = window_data_imputed[window_data_imputed['eom'] == window_dates[-1]]
+    last_ids = last_win_data['id'].unique()
     
 
-    y_next = next_data_imputed['ret_local']
-    X_next = next_data_imputed[characteristics_to_keep]
-    X_last = last_data[characteristics_to_keep]
+    # Get the predict/next data but only keep stocks & characteristics appeared in last data
+    ft_data = df[df['eom'] == current_date]
+    
+    # only use characteristics that appear in the train data
+    ft_data_aligned = ft_data[last_win_data.columns]
+    ft_data_imputed, _ = IPCA_impute_w_mean(ft_data_aligned, characteristics_to_keep, drop_characteristics=False)
+    
+
+    y_next = ft_data_imputed['ret_local_lead1m']
+    X_next = ft_data_imputed[characteristics_to_keep]
+    X_last = last_win_data[characteristics_to_keep]
     
     assert X_next.shape[1] == X_last.shape[1], "Charateristics used for prediction has to be the same\
                     as the characteristics used for training"
     
     # IPCA model
     window_data_imputed.set_index(['id', 'eom'], inplace=True)
-    y = window_data_imputed['ret_local'] #cur return
+    y = window_data_imputed['ret_local_lead1m'] #lead return
     X = window_data_imputed[characteristics_to_keep]
-    regr = InstrumentedPCA(n_factors=K, intercept=False, iter_tol=1e-4)
-    regr = regr.fit(X=X, y=y, quiet = True)
-    Gamma, Factors = regr.get_factors(label_ind=True)
+    
+  
+    def get_ipca(X, y, K, step, date):
+        while K >= 2:
+            
+            try:
+                regr = InstrumentedPCA(n_factors=K, intercept=False, max_iter=500, iter_tol=1e-4, n_jobs= -1)
+                regr = regr.fit(X=X, y=y, quiet = True)
+                Gamma, Factors = regr.get_factors(label_ind=True)
+                return Gamma, Factors
+            except Exception as e:
+                with lock:
+                    logger.log_error(f'ValueError for ({step}, K={K}): {date}', e)
+                K -= 1
+        
+        raise ValueError("Unable to fit the model with K >= 2")
+    
+    try:
+        Gamma, Factors = get_ipca(X, y, K, step, current_date)
+    except Exception as e:
+        with lock:
+            logger.log_error(f'ValueError for {step}: {current_date}', e)
+        raise 
     
     return Gamma, Factors, y_next, X_next, X_last, last_ids
