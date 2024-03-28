@@ -17,3 +17,7 @@ PortOpt_factor/
 data/
 logs/
 tests/
+results/
+
+#server jobs
+IPCA.ipynb
