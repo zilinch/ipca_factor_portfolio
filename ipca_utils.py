@@ -37,7 +37,6 @@ def normalize(
         raise NotImplementedError
     
     def scale_characteristics(group):
-        print (scaler)
         group[characteristics] = scaler.fit_transform(group[characteristics])
         return group
     
