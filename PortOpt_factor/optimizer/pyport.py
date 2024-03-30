@@ -729,13 +729,18 @@ def portfolio_optimization(meanVec,sigMat,retTarget,longShort,maxAlloc=1,lambda_
     # Solve problem
     res = prob.solve()
     w_opt = res.x
-    if not w_opt.all():
-        w_opt = np.ones(d) / d
-
+    
     if maxShar:
-        w_opt = w_opt[:d]/w_opt[-1]
+        if not w_opt.all():
+            w_opt = np.ones(d) / d
+        else:
+            w_opt = w_opt[:d]/w_opt[-1]
     else:
-        w_opt = w_opt[:d]
+        if not w_opt.all():
+            w_opt = np.ones(d) / d
+        else:
+            w_opt = w_opt[:d]
+            
     Var_opt = np.dot(np.dot(w_opt, sigMat), w_opt.transpose())
     if assetsOrder:
         w_opt = w_opt[assetsOrder]

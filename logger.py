@@ -39,8 +39,9 @@ class ErrorLogger:
             logger.error(f'Action: {action}')  # Optionally log the action taken or recommended
 
 
-if __name__ == "__main__":
-    logger = ErrorLogger()  # Instantiates the ErrorLogger
 
-    # Log another error with only the message
-    logger.log_error('user_authentication', 'User login failed due to invalid credentials.')
+# if __name__ == "__main__":
+#     logger = ErrorLogger()  # Instantiates the ErrorLogger
+
+#     # Log another error with only the message
+#     logger.log_error('user_authentication', 'User login failed due to invalid credentials.')

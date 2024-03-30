@@ -5,7 +5,8 @@ env_ipcs/
 
 **/.ipynb_checkpoints
 
-**/__pycache__/
+**/__pycache__
+PortOpt_factor/optimizer/__pycache__
 # Ignore all .pyc files
 **/*.pyc
 
@@ -18,6 +19,9 @@ data/
 logs/
 tests/
 results/
+
+# logs
+error_log.txt
 
 #server jobs
 IPCA.ipynb
