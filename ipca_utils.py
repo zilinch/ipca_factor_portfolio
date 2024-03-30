@@ -75,7 +75,7 @@ def IPCA_factor(
     
     try:
         regr = InstrumentedPCA(n_factors=K, intercept=False, max_iter=400, iter_tol=1e-4)
-        regr = regr.fit(X=X, y=y, quiet = True)
+        regr = regr.fit(X=X, y=y, quiet = False)
         Gamma, Factors = regr.get_factors(label_ind=True)
     except:
         raise ValueError(f"Unable to fit IPCA model with K = {K}")
