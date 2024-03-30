@@ -1,10 +1,10 @@
 from typing import List
 import sys
 sys.path.append('/gpfs/home/zilinchen/ipca_factor_portfolio/ipca/ipca/')
-from my_ipca import InstrumentedPCA
+from ipca import InstrumentedPCA
 
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, QuantileTransformer
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -25,13 +25,19 @@ def impute_w_median(
 def normalize(
     df: pd.DataFrame,
     characteristics: List,
-    scaler = None
+    scaler = 'standard'
 ):
-    if scaler is None:
+    if scaler =='standard':
         scaler = StandardScaler()
+    elif scaler == 'quantile':
+        scaler = QuantileTransformer()
+    elif scaler == 'minmax':
+        scaler = MinMaxScaler()
+    else:
+        raise NotImplementedError
     
     def scale_characteristics(group):
-        scaler = StandardScaler()
+        print (scaler)
         group[characteristics] = scaler.fit_transform(group[characteristics])
         return group
     
@@ -42,10 +48,11 @@ def normalize(
     
 
 
-def IPCA_factor(window_data, characteristics, K):
-    
-    # global lock
-         
+def IPCA_factor(
+    window_data, 
+    characteristics, 
+    K
+):        
     # Get the last date data from the window data
     last_date = max(window_data['eom'].values)
     last_win_data = window_data[window_data['eom'] == last_date]
