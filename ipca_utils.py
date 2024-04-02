@@ -52,30 +52,34 @@ def IPCA_factor(
     characteristics, 
     K
 ):        
-    # Get the last date data from the window data
+    # Get the last date data and train data from the window data
     last_date = max(window_data['eom'].values)
     last_win_data = window_data[window_data['eom'] == last_date]
+    last_win_data.set_index('id', inplace=True)
+    train_data = window_data[window_data['eom'] != last_date]
     
+    # Remove null columns from both last period and window data
     chars_to_drop = []
-    null_columns = last_win_data.columns[last_win_data.isna().any()]
+    null_columns_last = last_win_data.columns[last_win_data.isna().any()]
+    null_columns_window = train_data.columns[train_data.isna().any()]
     for char in characteristics:
-        if char in null_columns:
+        if (char in null_columns_last) or (char in null_columns_window):
             chars_to_drop.append(char)
     chars_to_keep = [item for item in characteristics if item not in chars_to_drop]
-    
+
     r_t = last_win_data['ret_local_lead1m']
     excess_r_t = last_win_data['ret_exc_lead1m']
     X_last = last_win_data[chars_to_keep]
 
+    
     # IPCA model
-    train_data = window_data[window_data['eom'] != last_date]
     train_data.set_index(['id', 'eom'], inplace=True)
     y = train_data['ret_local_lead1m'] #lead return
     X = train_data[chars_to_keep]
     
     try:
         regr = InstrumentedPCA(n_factors=K, intercept=False, max_iter=400, iter_tol=1e-4)
-        regr = regr.fit(X=X, y=y, quiet = False)
+        regr = regr.fit(X=X, y=y, quiet = True)
         Gamma, Factors = regr.get_factors(label_ind=True)
     except:
         raise ValueError(f"Unable to fit IPCA model with K = {K}")
