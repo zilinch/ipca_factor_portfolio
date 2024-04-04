@@ -23,3 +23,6 @@ error_log.txt
 
 #server jobs
 IPCA.ipynb
+
+# temporary test notebook
+/temp.ipynb
