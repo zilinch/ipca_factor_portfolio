@@ -1,10 +1,10 @@
 from typing import List
 import sys
-sys.path.append('/gpfs/home/zilinchen/ipca_factor_portfolio/ipca/ipca/')
 from ipca import InstrumentedPCA
 
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, QuantileTransformer
+import gc
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -54,34 +54,46 @@ def IPCA_factor(
 ):        
     # Get the last date data and train data from the window data
     last_date = max(window_data['eom'].values)
-    last_win_data = window_data[window_data['eom'] == last_date]
+    last_win_data = window_data[window_data['eom'] == last_date].copy()
     last_win_data.set_index('id', inplace=True)
-    train_data = window_data[window_data['eom'] != last_date]
+    train_data = window_data[window_data['eom'] != last_date].copy()
     
-    # Remove null columns from both last period and window data
-    chars_to_drop = []
-    null_columns_last = last_win_data.columns[last_win_data.isna().any()]
-    null_columns_window = train_data.columns[train_data.isna().any()]
+    # Only use columns with limited NaN
+    nan_threshold = 0.05
+    chars_to_keep = []
     for char in characteristics:
-        if (char in null_columns_last) or (char in null_columns_window):
-            chars_to_drop.append(char)
-    chars_to_keep = [item for item in characteristics if item not in chars_to_drop]
-
+        if train_data[char].isna().mean() <= nan_threshold:
+            chars_to_keep.append(char)
     r_t = last_win_data['ret_local_lead1m']
     excess_r_t = last_win_data['ret_exc_lead1m']
     X_last = last_win_data[chars_to_keep]
-
     
-    # IPCA model
-    train_data.set_index(['id', 'eom'], inplace=True)
+    # Drop rows where lead 1m return (label) is missing
+    train_data = train_data.dropna(subset=["ret_local_lead1m"])
+    
+    # Prepare data for IPCA model
+    train_data.set_index(['id', 'eom'], inplace=True) # this format is required for Kelly's IPCA module
     y = train_data['ret_local_lead1m'] #lead return
     X = train_data[chars_to_keep]
+    
+    ## Fill NA with median
+    X = X.fillna(X.median())
+    X_last = X_last.fillna(X.median()) # Don't use future info?
     
     try:
         regr = InstrumentedPCA(n_factors=K, intercept=False, max_iter=400, iter_tol=1e-4)
         regr = regr.fit(X=X, y=y, quiet = True)
         Gamma, Factors = regr.get_factors(label_ind=True)
+        # Free up memory immediately
+        del train_data
+        del last_win_data
+        gc.collect()
     except:
+        # Free up memory immediately
+        del train_data
+        del last_win_data
+        gc.collect()
+
         raise ValueError(f"Unable to fit IPCA model with K = {K}")
     
     return Gamma, Factors, r_t, excess_r_t, X_last
