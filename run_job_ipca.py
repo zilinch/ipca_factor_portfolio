@@ -34,13 +34,13 @@ def ipca_step_t(t, window_size, df_ipca, unique_dates, K, characteristics, log_f
     date_to_predict = unique_dates[t]
 
     # Skip if already has result
-    if os.path.isfile(f"{ipca_fp}{date_to_predict}.pickle"):
-        print (f'====== Skipped: {t}: {date_to_predict} ======')
+    if os.path.isfile(f"{ipca_fp}predicting_{date_to_predict}.pickle"):
+        print (f'====== Skipped: {t}: Date to predict: {date_to_predict} ======')
         return 0
     
     logger = ErrorLogger(log_filename=log_fp) #logger
     
-    print (f'====== Started: {t}: {date_to_predict} ======')
+    print (f'====== Started: {t}: Date to predict: {date_to_predict} ======')
     
     # Fit ipca
     try:
@@ -51,10 +51,10 @@ def ipca_step_t(t, window_size, df_ipca, unique_dates, K, characteristics, log_f
         return 0
     
     ipca_output_t = [date_to_predict, Gamma, Factors, r_t, excess_r_t, X_last]
-    with open(f"{ipca_fp}{date_to_predict}.pickle", 'wb') as handle:
+    with open(f"{ipca_fp}predicting_{date_to_predict}.pickle", 'wb') as handle:
         pickle.dump(ipca_output_t, handle)
 
-    print (f'====== Complete: {t}: {date_to_predict} ======')
+    print (f'====== Complete: {t}: Date to predict: {date_to_predict} ======')
 
     return 0
 
