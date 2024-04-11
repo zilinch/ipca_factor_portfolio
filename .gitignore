@@ -10,7 +10,7 @@ env_ipcs/
 
 #ipca repo
 ipca/
-PortOpt_factor/
+run_job_local.py
 
 #data
 data/

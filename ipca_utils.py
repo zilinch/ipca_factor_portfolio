@@ -69,6 +69,7 @@ def IPCA_factor(
 
     r_t = last_win_data['ret_local_lead1m']
     excess_r_t = last_win_data['ret_exc_lead1m']
+    beta_252d = last_win_data['betadown_252d'] 
     X_last = last_win_data[chars_to_keep]
 
     
@@ -84,4 +85,4 @@ def IPCA_factor(
     except:
         raise ValueError(f"Unable to fit IPCA model with K = {K}")
     
-    return Gamma, Factors, r_t, excess_r_t, X_last
+    return Gamma, Factors, r_t, excess_r_t, X_last, beta_252d
