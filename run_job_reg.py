@@ -7,7 +7,7 @@ import os
 from tqdm import tqdm
 from datetime import datetime
 
-from PortOpt_factor.optimizer import pyport
+from port_solver import portfolio_optimization
 from ipca_utils import IPCA_factor
 from logger import ErrorLogger
 
@@ -33,18 +33,14 @@ def ipca_step_t(t, window_size, df_ipca, unique_dates, K, characteristics, log_f
     
     # calculate ipca
     try:
-        Gamma, Factors, r_t, excess_r_t, X_last = IPCA_factor(window_data, characteristics, K)
+        Gamma, Factors, r_t, excess_r_t, X_last, beta = IPCA_factor(window_data, characteristics, K)
     except Exception as e:
         with lock:
             logger.log_error(date_to_predict, e)
         return 0
 
-    # regularization
+  
     V_t = inv(Gamma.T @ X_last.T @ X_last @ Gamma) @ Gamma.T @ X_last.T
-    reg_mat = np.zeros_like(V_t)
-    reg_mat[:K, :K] = np.eye(K)*1e-04
-    V_t += reg_mat
-
     Sigma_t = np.cov(Factors, rowvar = True)
     mu_t = np.array(np.mean(Factors, axis=1))
 
@@ -56,7 +52,7 @@ def ipca_step_t(t, window_size, df_ipca, unique_dates, K, characteristics, log_f
     with tqdm(total=total_iteration, desc="Lambda Reg Progress") as pbar:
         for lambda1, lambda2 in product(g1, g2):
             try:
-                OptimalPortfolioWeights_t = pyport.portfolio_optimization(
+                OptimalPortfolioWeights_t = portfolio_optimization(
                     meanVec=np.array(mu_t),
                     sigMat=np.array(Sigma_t),
                     retTarget=0,
@@ -83,14 +79,14 @@ def ipca_step_t(t, window_size, df_ipca, unique_dates, K, characteristics, log_f
                     Q_w=None,
                     Q_b=None,
                     Q_bench=None
-                )[0].reshape(-1, 1)
+                )
             except Exception as e:
                 with lock:
                     logger.log_error(date_to_predict, e)
                 return 0
-    
-            ret_t = (V_t @ r_t).T @ OptimalPortfolioWeights_t
-            excess_ret_t = (V_t @ excess_r_t).T @ OptimalPortfolioWeights_t
+            
+            ret_t = (V_t.T @ OptimalPortfolioWeights_t).T @ r_t
+            excess_ret_t = (V_t.T @ OptimalPortfolioWeights_t).T @ excess_r_t
             w_individual = np.dot(np.array(V_t.T), OptimalPortfolioWeights_t).flatten()
             pos_weight = w_individual[w_individual > 0].sum()
 
@@ -130,11 +126,11 @@ def main():
         os.makedirs(res_fp)
     
     args_list = [(t, window_size, df_ipca, unique_dates, K, characteristics, log_fp, res_fp) \
-                        for t in range(window_size, T)]
+                        for t in range(window_size, window_size+1)]
     
     
     lock = Lock()
-    with Pool(initializer=init_pool_lock, initargs=(lock,)) as pool:
+    with Pool(processes=1, initializer=init_pool_lock, initargs=(lock,)) as pool:
         pool.map(ipca_step_t_wrapper, args_list)
 
     return 0

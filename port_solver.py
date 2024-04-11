@@ -370,17 +370,17 @@ def portfolio_optimization(meanVec,sigMat,retTarget,longShort,maxAlloc=1,lambda_
     sol = solvers.qp(P, q, G, h, A, b)
     # Solve problem
     w_opt = np.array(sol['x'])
-    test_individual = np.dot(factor, w_opt[:d].reshape(-1,1))/w_opt[-1]
-    print('maximum')
-    print(max(test_individual))
-    print('long')
-    print(np.sum(test_individual[test_individual > 0]))
-    print('positive')
-    print(np.sum(w_opt[d:d+N]/w_opt[-1]))
-    print('negative')
-    print(np.sum(w_opt[d+N:d+2*N]/w_opt[-1]))
-    print('kappa')
-    print(w_opt[-1])
+    # test_individual = np.dot(factor, w_opt[:d].reshape(-1,1))/w_opt[-1]
+    # print('maximum')
+    # print(max(test_individual))
+    # print('long')
+    # print(np.sum(test_individual[test_individual > 0]))
+    # print('positive')
+    # print(np.sum(w_opt[d:d+N]/w_opt[-1]))
+    # print('negative')
+    # print(np.sum(w_opt[d+N:d+2*N]/w_opt[-1]))
+    # print('kappa')
+    # print(w_opt[-1])
     
     if maxShar:
         if not w_opt.all():
