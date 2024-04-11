@@ -47,60 +47,61 @@ def ipca_step_t(t, window_size, df_ipca, unique_dates, K, characteristics, log_f
     # Grid search for regularization terms
     g1 = np.exp(np.linspace( np.log(1e-6),np.log(5),10))
     g2 = np.exp(np.linspace( np.log(1e-6),np.log(5),10))
-    total_iteration = len(g1)*len(g2)
     
-    with tqdm(total=total_iteration, desc="Lambda Reg Progress") as pbar:
-        for lambda1, lambda2 in product(g1, g2):
-            try:
-                OptimalPortfolioWeights_t = portfolio_optimization(
-                    meanVec=np.array(mu_t),
-                    sigMat=np.array(Sigma_t),
-                    retTarget=0,
-                    longShort=0.2,
-                    maxAlloc=0.08,
-                    lambda_l1=lambda1,
-                    lambda_l2=lambda2,
-                    riskfree=0,
-                    assetsOrder=None,
-                    maxShar=1,
-                    factor=np.array(V_t.T),
-                    turnover=None,
-                    w_pre=None,
-                    individual=False,
-                    exposure_constrain=0,
-                    w_bench=None,
-                    factor_exposure_constrain=None,
-                    U_factor=None,
-                    general_linear_constrain=None,
-                    U_genlinear=0,
-                    w_general=None,
-                    TE_constrain=0,
-                    general_quad=0,
-                    Q_w=None,
-                    Q_b=None,
-                    Q_bench=None
-                )
-            except Exception as e:
-                with lock:
-                    logger.log_error(date_to_predict, e)
-                return 0
-            
-            ret_t = (V_t.T @ OptimalPortfolioWeights_t).T @ r_t
-            excess_ret_t = (V_t.T @ OptimalPortfolioWeights_t).T @ excess_r_t
-            w_individual = np.dot(np.array(V_t.T), OptimalPortfolioWeights_t).flatten()
-            pos_weight = w_individual[w_individual > 0].sum()
+    try:
+        OptimalPortfolioWeights_t = portfolio_optimization(
+            meanVec=np.array(mu_t),
+            sigMat=np.array(Sigma_t),
+            retTarget=0,
+            longShort=0.2,
+            maxAlloc=0.08,
+            lambda_l1=g1[0],
+            lambda_l2=g2[0],
+            riskfree=0,
+            assetsOrder=None,
+            maxShar=1,
+            factor=np.array(V_t.T),
+            turnover=None,
+            w_pre=None,
+            individual=False,
+            exposure_constrain=0,
+            w_bench=None,
+            factor_exposure_constrain=None,
+            U_factor=None,
+            general_linear_constrain=None,
+            U_genlinear=0,
+            w_general=None,
+            TE_constrain=0,
+            general_quad=0,
+            Q_w=None,
+            Q_b=None,
+            Q_bench=None
+        )
+    except Exception as e:
+        with lock:
+            logger.log_error(date_to_predict, e)
+        return 0
+    
+    ret_t = (V_t.T @ OptimalPortfolioWeights_t).T @ r_t
+    excess_ret_t = (V_t.T @ OptimalPortfolioWeights_t).T @ excess_r_t
+    w_individual = np.dot(np.array(V_t.T), OptimalPortfolioWeights_t).flatten()
+    pos_weight = w_individual[w_individual > 0].sum()
 
-            df_results = pd.DataFrame([[date_to_predict, ret_t[0], excess_ret_t[0], pos_weight, lambda1, lambda2]],
-                          columns=['Date', 'P_Return', 'P_Excess_Return', 'Sum_Positive_Weights', 'Lambda_l1', 'Lambda_l2'])
+    df_results = pd.DataFrame({
+        "ID": X_last.index,
+        "Weights": w_individual
+    })
 
-            fn = res_fp + str(date_to_predict) + '.csv'
-            df_results.to_csv(fn, mode='a', index=False, header=not os.path.exists(res_fp))
-            
-            pbar.update(1)
+    fn = res_fp + str(date_to_predict) + '.csv'
+    df_results.to_csv(fn, mode='a', index=False, header=not os.path.exists(res_fp))
     
-    return 0
+    ret_fn = res_fp + 'returns.csv'
+    with lock:
+        ret_df = pd.DataFrame([[date_to_predict, ret_t[0], excess_ret_t[0], pos_weight]],
+                    columns=['Date', 'P_Return', 'Excess_P_Return', 'Pos_Weight'])
+        ret_df.to_csv(ret_fn, mode='a', index=False, header=not os.path.exists(res_fp))
     
-               
+    return 0           
 
 
 def main():
@@ -118,10 +119,9 @@ def main():
     T = len(unique_dates)
    
     current_date = datetime.now().strftime('%Y-%m-%d')
-    log_fp = "logs/"+f"{current_date}-w{window_size}-log-error-reg.txt"
-    res_fp = "results/"+f"lambdas-{current_date}-w{window_size}/"
+    log_fp = "logs/"+f"{current_date}-w{window_size}-log-error-nonreg.txt"
+    res_fp = "results/"+f"weights-{current_date}-w{window_size}/"
     
-    # wts_fp = "results/"+f"{current_date}-w{window_size}/"
     if not os.path.exists(res_fp):
         os.makedirs(res_fp)
     
